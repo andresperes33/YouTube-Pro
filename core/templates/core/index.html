@@ -1,0 +1,210 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Downloader Pro | Baixe em 1080p</title>
+    <meta name="description"
+        content="A melhor ferramenta para baixar vídeos do YouTube em alta qualidade 1080p com áudio.">
+    <link rel="stylesheet" href="{% static 'core/style.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <h1>YouTube Download Pro</h1>
+            <p>Baixe vídeos do YouTube em alta qualidade com áudio</p>
+        </header>
+
+        <section class="input-section">
+            <div class="platform-icons">
+                <div class="platform-tag yt"><i class="fa-brands fa-youtube"></i> YouTube</div>
+            </div>
+            <div class="search-box">
+                <input type="text" id="youtube-url" placeholder="Cole o link do vídeo aqui..." autocomplete="off">
+                <button id="get-info-btn">Analisar</button>
+            </div>
+
+            <div id="video-card" class="video-card">
+                <div class="video-thumb">
+                    <img id="v-thumb" src="" alt="Thumbnail">
+                </div>
+                <div class="video-info">
+                    <h3 id="v-title">Título do Vídeo</h3>
+                    <p id="v-author">Canal</p>
+                    <div class="download-controls">
+                        <div class="select-group">
+                            <div class="custom-dropdown" id="res-dropdown">
+                                <div class="dropdown-trigger" id="dropdown-trigger">
+                                    <span id="selected-res-text">Carregando qualidades...</span>
+                                    <i class="fa-solid fa-chevron-down select-icon"></i>
+                                </div>
+                                <div class="dropdown-menu" id="res-menu">
+                                    <!-- Options populated by JS -->
+                                </div>
+                                <input type="hidden" id="res-select" value="">
+                            </div>
+                        </div>
+                        <button id="download-btn" class="download-btn">🚀 Baixar Agora</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="status-section" class="status-section">
+                <p id="status-text"><span class="loader"></span> Processando...</p>
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+            </div>
+        </section>
+
+        <div id="result-section" style="display: none; text-align: center; margin-top: 1rem;">
+            <p style="color: #4cd137; font-weight: 600; margin-bottom: 1rem;">Download concluído com sucesso!</p>
+            <a id="final-link" href="#" class="download-btn" download
+                style="text-decoration: none; background: #00a8ff;">💾 Baixar Arquivo</a>
+        </div>
+    </div>
+
+    <footer>
+        Desenvolvido com ❤️ com Django
+    </footer>
+
+    <script>
+        const getInfoBtn = document.getElementById('get-info-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const urlInput = document.getElementById('youtube-url');
+        const videoCard = document.getElementById('video-card');
+        const statusSection = document.getElementById('status-section');
+        const resultSection = document.getElementById('result-section');
+        const progressFill = document.getElementById('progress-fill');
+        const statusText = document.getElementById('status-text');
+
+        const csrftoken = '{{ csrf_token }}';
+
+        getInfoBtn.addEventListener('click', async () => {
+            const url = urlInput.value.trim();
+            if (!url) return alert('Por favor, insira um link.');
+
+            getInfoBtn.disabled = true;
+            getInfoBtn.innerText = 'Buscando...';
+            videoCard.classList.remove('active');
+            statusSection.style.display = 'none';
+            resultSection.style.display = 'none';
+
+            try {
+                const response = await fetch('/download/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken
+                    },
+                    body: JSON.stringify({ url, action: 'info' })
+                });
+
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+
+                document.getElementById('v-thumb').src = data.thumbnail;
+                document.getElementById('v-title').innerText = data.title;
+                document.getElementById('v-author').innerText = data.author;
+
+                const resMenu = document.getElementById('res-menu');
+                const resText = document.getElementById('selected-res-text');
+                const resInput = document.getElementById('res-select');
+                resMenu.innerHTML = '';
+
+                data.resolutions.forEach((res, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'dropdown-item';
+                    item.innerText = res;
+                    item.dataset.value = res;
+
+                    if (index === 0) {
+                        resText.innerText = res;
+                        resInput.value = res;
+                        item.classList.add('active');
+                    }
+
+                    item.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        resText.innerText = res;
+                        resInput.value = res;
+                        document.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
+                        item.classList.add('active');
+                        document.getElementById('res-dropdown').classList.remove('open');
+                    });
+
+                    resMenu.appendChild(item);
+                });
+
+                // Toggle logic
+                const dropdown = document.getElementById('res-dropdown');
+                const trigger = document.getElementById('dropdown-trigger');
+
+                trigger.onclick = (e) => {
+                    e.stopPropagation();
+                    dropdown.classList.toggle('open');
+                };
+
+                // Close when clicking outside
+                window.addEventListener('click', () => {
+                    dropdown.classList.remove('open');
+                });
+
+                videoCard.classList.add('active');
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                getInfoBtn.disabled = false;
+                getInfoBtn.innerText = 'Analisar';
+            }
+        });
+
+        downloadBtn.addEventListener('click', async () => {
+            const url = urlInput.value.trim();
+            const resSelect = document.getElementById('res-select');
+            const resolution = resSelect.value || '1080p';
+
+            downloadBtn.disabled = true;
+            statusSection.style.display = 'block';
+            resultSection.style.display = 'none';
+            progressFill.style.width = '20%';
+            statusText.innerHTML = '<span class="loader"></span> Baixando e processando vídeo...';
+
+            try {
+                const response = await fetch('/download/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken
+                    },
+                    body: JSON.stringify({ url, action: 'download', resolution })
+                });
+
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+
+                progressFill.style.width = '100%';
+                statusText.innerText = 'Concluído!';
+
+                document.getElementById('final-link').href = data.url;
+                resultSection.style.display = 'block';
+
+            } catch (err) {
+                alert(err.message);
+                statusSection.style.display = 'none';
+            } finally {
+                downloadBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>
