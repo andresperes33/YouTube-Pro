@@ -29,7 +29,7 @@ def get_video_info(url):
             'quiet': True,
             'noplaylist': True,
             'skip_download': True,
-            'js_runtimes': ['node'],
+            'js_runtimes': {'node': {}},
             'remote_components': ['ejs:github'],
         }
 
@@ -79,7 +79,7 @@ def download_and_merge(url, resolution='1080p'):
             'ffmpeg_location': ffmpeg_bin,
             'quiet': True,
             'noplaylist': True,
-            'js_runtimes': ['node'],
+            'js_runtimes': {'node': {}},
             'remote_components': ['ejs:github'],
         }
 
