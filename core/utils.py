@@ -25,7 +25,17 @@ def cleanup_old_files():
 
 def get_video_info(url):
     try:
-        with yt_dlp.YoutubeDL({'quiet': True, 'noplaylist': True, 'skip_download': True}) as ydl:
+        ydl_opts = {
+            'quiet': True,
+            'noplaylist': True,
+            'skip_download': True,
+        }
+
+        cookies_file = os.getenv('YTDLP_COOKIES_FILE')
+        if cookies_file and os.path.exists(cookies_file):
+            ydl_opts['cookiefile'] = cookies_file
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
 
         resolutions = sorted(
@@ -68,6 +78,10 @@ def download_and_merge(url, resolution='1080p'):
             'quiet': True,
             'noplaylist': True,
         }
+
+        cookies_file = os.getenv('YTDLP_COOKIES_FILE')
+        if cookies_file and os.path.exists(cookies_file):
+            ydl_opts['cookiefile'] = cookies_file
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
