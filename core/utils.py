@@ -1,5 +1,7 @@
 import os
 import subprocess
+import tempfile
+from uuid import uuid4
 from pytubefix import YouTube
 from django.conf import settings
 import time
@@ -43,8 +45,10 @@ def get_video_info(url):
         return None
 
 def download_and_merge(url, resolution='1080p'):
-    cleanup_old_files()
     try:
+        os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
+        cleanup_old_files()
+
         yt = YouTube(url)
         
         # Filter video and audio
@@ -81,37 +85,29 @@ def download_and_merge(url, resolution='1080p'):
         if not video_stream or not audio_stream:
             return None
 
-        # Temp paths
-        video_temp = os.path.join(settings.MEDIA_ROOT, "video_temp.mp4")
-        audio_temp = os.path.join(settings.MEDIA_ROOT, "audio_temp.mp4")
-        
         # Safe title
         safe_title = "".join(c for c in yt.title if c.isalnum() or c in (' ', '-', '_')).strip()[:50]
-        output_filename = f"{safe_title}_{video_stream.resolution}.mp4"
+        output_filename = f"{safe_title}_{video_stream.resolution}_{uuid4().hex[:8]}.mp4"
         output_path = os.path.join(settings.MEDIA_ROOT, output_filename)
 
-        # Download
-        video_stream.download(output_path=settings.MEDIA_ROOT, filename="video_temp.mp4")
-        audio_stream.download(output_path=settings.MEDIA_ROOT, filename="audio_temp.mp4")
-        
-        # Path to local FFmpeg
-        # On Windows it's ffmpeg.exe, on Linux it's usually just ffmpeg
-        ffmpeg_bin = os.path.join(settings.BASE_DIR, 'bin', 'ffmpeg.exe')
-        
-        # If it doesn't exist (e.g. on Linux server), fallback to global 'ffmpeg'
-        if not os.path.exists(ffmpeg_bin):
-            ffmpeg_bin = 'ffmpeg'
+        # Use an isolated temp directory so concurrent downloads do not collide.
+        with tempfile.TemporaryDirectory(dir=settings.MEDIA_ROOT) as temp_dir:
+            video_temp = os.path.join(temp_dir, 'video.mp4')
+            audio_temp = os.path.join(temp_dir, 'audio.mp4')
 
-        # Merge using FFmpeg
-        subprocess.run([
-            ffmpeg_bin, "-i", video_temp, "-i", audio_temp,
-            "-c:v", "copy", "-c:a", "aac", "-strict", "experimental", "-y", output_path
-        ], capture_output=True, text=True, check=True)
-        
-        # Cleanup
-        if os.path.exists(video_temp): os.remove(video_temp)
-        if os.path.exists(audio_temp): os.remove(audio_temp)
-        
+            video_stream.download(output_path=temp_dir, filename='video.mp4')
+            audio_stream.download(output_path=temp_dir, filename='audio.mp4')
+
+            # On Windows it's ffmpeg.exe, on Linux it's usually just ffmpeg.
+            ffmpeg_bin = os.path.join(settings.BASE_DIR, 'bin', 'ffmpeg.exe')
+            if not os.path.exists(ffmpeg_bin):
+                ffmpeg_bin = 'ffmpeg'
+
+            subprocess.run([
+                ffmpeg_bin, '-i', video_temp, '-i', audio_temp,
+                '-c:v', 'copy', '-c:a', 'aac', '-strict', 'experimental', '-y', output_path
+            ], capture_output=True, text=True, check=True)
+
         return {
             'filename': output_filename,
             'url': settings.MEDIA_URL + output_filename,

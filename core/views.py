@@ -2,15 +2,20 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from .utils import get_video_info, download_and_merge
 import json
+from json import JSONDecodeError
 
 def index(request):
     return render(request, 'core/index.html')
 
 def download_video_view(request):
     if request.method == 'POST':
-        data = json.loads(request.body)
+        try:
+            data = json.loads(request.body or b'{}')
+        except JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
         url = data.get('url', '').strip()
-        action = data.get('action') # 'info' or 'download'
+        action = data.get('action')  # 'info' or 'download'
         resolution = data.get('resolution', '1080p')
 
         if not url:
@@ -33,5 +38,7 @@ def download_video_view(request):
                 return JsonResponse({
                     'error': '❌ Falha no download. Verifique sua conexão e tente novamente.'
                 }, status=500)
+
+        return JsonResponse({'error': 'Invalid action'}, status=400)
 
     return JsonResponse({'error': 'Invalid request'}, status=400)

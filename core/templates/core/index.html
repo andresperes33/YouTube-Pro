@@ -85,8 +85,19 @@
         const resultSection = document.getElementById('result-section');
         const progressFill = document.getElementById('progress-fill');
         const statusText = document.getElementById('status-text');
+        const dropdown = document.getElementById('res-dropdown');
+        const trigger = document.getElementById('dropdown-trigger');
 
         const csrftoken = '{{ csrf_token }}';
+
+        trigger.onclick = (e) => {
+            e.stopPropagation();
+            dropdown.classList.toggle('open');
+        };
+
+        window.addEventListener('click', () => {
+            dropdown.classList.remove('open');
+        });
 
         getInfoBtn.addEventListener('click', async () => {
             const url = urlInput.value.trim();
@@ -142,20 +153,6 @@
                     });
 
                     resMenu.appendChild(item);
-                });
-
-                // Toggle logic
-                const dropdown = document.getElementById('res-dropdown');
-                const trigger = document.getElementById('dropdown-trigger');
-
-                trigger.onclick = (e) => {
-                    e.stopPropagation();
-                    dropdown.classList.toggle('open');
-                };
-
-                // Close when clicking outside
-                window.addEventListener('click', () => {
-                    dropdown.classList.remove('open');
                 });
 
                 videoCard.classList.add('active');

@@ -1,0 +1,17 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_NAME: /data/db.sqlite3
+      MEDIA_ROOT: /data/media
+      MEDIA_URL: /media/
+    volumes:
+      - yt_data:/data
+    restart: unless-stopped
+
+volumes:
+  yt_data:
