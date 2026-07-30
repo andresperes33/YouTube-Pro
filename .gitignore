@@ -22,3 +22,7 @@ Thumbs.db
 # Binaries
 bin/
 *.exe
+
+# Runtime artifacts
+downloads/
+

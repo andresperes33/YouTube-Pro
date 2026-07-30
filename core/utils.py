@@ -1,9 +1,42 @@
 import os
+import shutil
 from glob import glob
 
 import yt_dlp
 from django.conf import settings
 import time
+
+def _js_runtime_opts():
+    runtime = os.getenv('YTDLP_JS_RUNTIME', '').strip().lower()
+    if runtime in {'node', 'deno', 'quickjs', 'bun'}:
+        return {'js_runtimes': {runtime: {}}}
+    for candidate in ('deno', 'node'):
+        if shutil.which(candidate) or shutil.which(f'{candidate}.exe'):
+            return {'js_runtimes': {candidate: {}}}
+    return {}
+
+
+def _cookie_opts():
+    cookies_file = os.getenv('YTDLP_COOKIES_FILE')
+    if cookies_file and os.path.exists(cookies_file):
+        return {'cookiefile': cookies_file}
+    return {}
+
+
+def _common_opts():
+    opts = {
+        'quiet': True,
+        'noplaylist': True,
+        'retries': 3,
+        'fragment_retries': 3,
+        'socket_timeout': 20,
+        'nocheckcertificate': False,
+        'remote_components': ['ejs:github'],
+    }
+    opts.update(_cookie_opts())
+    opts.update(_js_runtime_opts())
+    return opts
+
 
 def cleanup_old_files():
     """Remove files from media directory that are older than 2 hours."""
@@ -25,17 +58,7 @@ def cleanup_old_files():
 
 def get_video_info(url):
     try:
-        ydl_opts = {
-            'quiet': True,
-            'noplaylist': True,
-            'skip_download': True,
-            'js_runtimes': {'node': {}},
-            'remote_components': ['ejs:github'],
-        }
-
-        cookies_file = os.getenv('YTDLP_COOKIES_FILE')
-        if cookies_file and os.path.exists(cookies_file):
-            ydl_opts['cookiefile'] = cookies_file
+        ydl_opts = {**_common_opts(), 'skip_download': True}
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -73,19 +96,12 @@ def download_and_merge(url, resolution='1080p'):
             ffmpeg_bin = 'ffmpeg'
 
         ydl_opts = {
+            **_common_opts(),
             'format': f'bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'outtmpl': os.path.join(settings.MEDIA_ROOT, '%(title).50s_%(id)s.%(ext)s'),
             'merge_output_format': 'mp4',
             'ffmpeg_location': ffmpeg_bin,
-            'quiet': True,
-            'noplaylist': True,
-            'js_runtimes': {'node': {}},
-            'remote_components': ['ejs:github'],
         }
-
-        cookies_file = os.getenv('YTDLP_COOKIES_FILE')
-        if cookies_file and os.path.exists(cookies_file):
-            ydl_opts['cookiefile'] = cookies_file
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
